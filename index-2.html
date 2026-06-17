@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eesti ilm · mudelite konsensus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef2f5;
+    --surface:#ffffff;
+    --ink:#1b2a33;
+    --ink-soft:#5a6b75;
+    --ink-faint:#92a1aa;
+    --line:#dde5ea;
+    --temp:#e8743b;       /* consensus temperature */
+    --temp-soft:#f4c4a8;
+    --precip:#1c7c9c;      /* precipitation */
+    --precip-soft:#bfe0ea;
+    --agree:#3f9b6b;
+    --partial:#d8a23a;
+    --diverge:#d05a52;
+    --shadow:0 1px 2px rgba(27,42,51,.06), 0 8px 24px rgba(27,42,51,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;
+    line-height:1.5;
+    padding:clamp(16px,4vw,40px);
+    max-width:1080px;
+    margin:0 auto;
+  }
+  /* ---- header ---- */
+  header{
+    display:flex;flex-wrap:wrap;gap:16px;
+    align-items:flex-end;justify-content:space-between;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:12px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-faint);
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:clamp(26px,5vw,38px);font-weight:600;
+    letter-spacing:-.02em;line-height:1.05;
+  }
+  .sub{color:var(--ink-soft);font-size:14px;margin-top:8px;max-width:46ch}
+  .picker label{display:block;font-size:12px;color:var(--ink-faint);
+    font-weight:500;margin-bottom:6px;letter-spacing:.04em}
+  select{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:18px;font-weight:500;color:var(--ink);
+    background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;
+    padding:12px 40px 12px 16px;cursor:pointer;
+    box-shadow:var(--shadow);appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6b75' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  select:focus-visible{outline:2px solid var(--temp);outline-offset:2px}
+
+  /* ---- now strip ---- */
+  .now{
+    background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+    padding:clamp(18px,3vw,26px);margin-bottom:22px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:clamp(18px,4vw,40px);
+  }
+  .now-temp{display:flex;align-items:baseline;gap:4px}
+  .now-temp .big{
+    font-family:"Space Grotesk",sans-serif;font-weight:600;
+    font-size:clamp(48px,11vw,72px);line-height:.9;
+    color:var(--temp);font-variant-numeric:tabular-nums;
+  }
+  .now-temp .deg{font-size:clamp(22px,5vw,30px);color:var(--temp);font-family:"Space Grotesk",sans-serif}
+  .now-meta{display:flex;flex-direction:column;gap:6px}
+  .now-meta .label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  .now-meta .val{font-size:15px;color:var(--ink-soft)}
+  .now-meta .val b{color:var(--ink);font-weight:600}
+  .now-range{font-family:"Space Grotesk",sans-serif;font-size:14px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+
+  /* ---- section shell ---- */
+  section{
+    background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+    padding:clamp(18px,3vw,28px);margin-bottom:22px;
+  }
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  h2{font-family:"Space Grotesk",sans-serif;font-size:18px;font-weight:600;letter-spacing:-.01em}
+  .sec-note{font-size:13px;color:var(--ink-faint)}
+
+  .chart-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-faint);margin:18px 0 8px}
+  .chart-wrap{position:relative;height:220px}
+  .chart-wrap.short{height:150px}
+
+  /* model legend */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+  .legend .item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft)}
+  .legend .swatch{width:18px;height:3px;border-radius:2px}
+  .legend .swatch.thick{height:5px}
+
+  /* ---- 7 day ---- */
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-top:14px}
+  .day{
+    border:1px solid var(--line);border-radius:14px;padding:14px 10px;
+    text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .day:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .day .dow{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:13px}
+  .day .date{font-size:11px;color:var(--ink-faint);margin-top:-4px}
+  .day .hi{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:24px;
+    font-variant-numeric:tabular-nums;color:var(--temp)}
+  .day .lo{font-size:13px;color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-top:-6px}
+  .day .rain{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--precip);
+    font-variant-numeric:tabular-nums;font-weight:500}
+  .day .agree{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint)}
+  .dot{width:8px;height:8px;border-radius:50%}
+
+  /* ---- states ---- */
+  .msg{padding:40px 16px;text-align:center;color:var(--ink-soft);font-size:14px}
+  .spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--temp);
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  footer{font-size:12px;color:var(--ink-faint);text-align:center;padding:6px 0 4px;line-height:1.7}
+  footer a{color:var(--ink-soft)}
+
+  @media(max-width:680px){
+    .days{grid-template-columns:repeat(4,1fr)}
+  }
+  @media(max-width:440px){
+    .days{grid-template-columns:repeat(3,1fr)}
+    header{align-items:stretch}
+    .picker{width:100%}
+    select{width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Mitme mudeli konsensus</div>
+    <h1>Eesti ilm</h1>
+    <p class="sub">Viis sõltumatut prognoosimudelit korraga. Paks joon on keskmine, õhukesed jooned üksikud mudelid — kus nad lahknevad, on prognoos ebakindel.</p>
+  </div>
+  <div class="picker">
+    <label for="city">Asukoht</label>
+    <select id="city"></select>
+  </div>
+</header>
+
+<div class="now" id="now">
+  <div class="msg"><div class="spinner"></div>Laen prognoosi…</div>
+</div>
+
+<section>
+  <div class="sec-head">
+    <h2>Järgmised 48 tundi</h2>
+    <span class="sec-note">tunni täpsusega</span>
+  </div>
+  <div class="chart-label">Temperatuur °C</div>
+  <div class="chart-wrap"><canvas id="tempChart"></canvas></div>
+  <div class="chart-label">Sademed mm/h · keskmine</div>
+  <div class="chart-wrap short"><canvas id="precipChart"></canvas></div>
+  <div class="legend" id="legend"></div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>7 päeva</h2>
+    <span class="sec-note">üldine suund</span>
+  </div>
+  <div class="days" id="days"></div>
+</section>
+
+<footer>
+  Andmed: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> ·
+  mudelid ECMWF, MET Norway, DWD ICON, NOAA GFS, KNMI<br>
+  Prognoos uueneb iga paari tunni tagant. Mida laiem mudelite hajuvus, seda ettevaatlikum tasub olla.
+</footer>
+
+<script>
+const CITIES = [
+  { name:"Tallinn",      lat:59.4370, lon:24.7536 },
+  { name:"Pärnu",        lat:58.3859, lon:24.4971 },
+  { name:"Tartu",        lat:58.3780, lon:26.7290 },
+  { name:"Saaremaa",     lat:58.2528, lon:22.4853 },
+  { name:"Narva-Jõesuu", lat:59.4561, lon:28.0411 },
+];
+
+const MODELS = [
+  { id:"ecmwf_ifs025",  name:"ECMWF",      color:"#3b6fb0" },
+  { id:"metno_nordic",  name:"MET Nordic 1 km", color:"#8e6fb0" },
+  { id:"icon_seamless", name:"ICON (DWD)", color:"#5aa9a3" },
+  { id:"gfs_seamless",  name:"GFS (NOAA)", color:"#c98a3b" },
+  { id:"knmi_seamless", name:"KNMI",       color:"#9ba84f" },
+];
+
+const DOW = ["Pühap","Esmasp","Teisip","Kolmap","Neljap","Reede","Laup"];
+const TEMP = "#e8743b", PRECIP = "#1c7c9c";
+
+let tempChart, precipChart;
+
+// ---- helpers ----
+const round = (x, d=0) => x==null ? null : Math.round(x*10**d)/10**d;
+
+// per-index consensus across models for an array of model-series
+function consensus(seriesByModel, len){
+  const mean=[], min=[], max=[];
+  for(let i=0;i<len;i++){
+    const vals=[];
+    for(const id in seriesByModel){
+      const v=seriesByModel[id]?.[i];
+      if(v!=null && !Number.isNaN(v)) vals.push(v);
+    }
+    if(vals.length){
+      mean.push(vals.reduce((a,b)=>a+b,0)/vals.length);
+      min.push(Math.min(...vals));
+      max.push(Math.max(...vals));
+    } else { mean.push(null); min.push(null); max.push(null); }
+  }
+  return {mean,min,max};
+}
+
+function collect(block, base){
+  const out={};
+  for(const m of MODELS){
+    const key = base+"_"+m.id;
+    if(block && block[key]) out[m.id]=block[key];
+  }
+  return out;
+}
+
+async function load(city){
+  setLoading();
+  const base="https://api.open-meteo.com/v1/forecast";
+  const ids=MODELS.map(m=>m.id).join(",");
+  const url=`${base}?latitude=${city.lat}&longitude=${city.lon}`+
+    `&hourly=temperature_2m,precipitation`+
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`+
+    `&current=temperature_2m,precipitation`+
+    `&forecast_days=7&timezone=Europe%2FTallinn&models=${ids}`;
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=await r.json();
+    render(data);
+  }catch(e){
+    setError();
+    console.error(e);
+  }
+}
+
+function setLoading(){
+  document.getElementById("now").innerHTML=
+    '<div class="msg"><div class="spinner"></div>Laen prognoosi…</div>';
+}
+function setError(){
+  document.getElementById("now").innerHTML=
+    '<div class="msg">Prognoosi ei õnnestunud laadida. Kontrolli internetiühendust ja proovi uuesti.</div>';
+}
+
+function render(data){
+  // locate "now" index in hourly time array
+  const times=data.hourly.time;
+  const nowRef=data.current?.time || times[0];
+  let n=times.findIndex(t=>t>=nowRef);
+  if(n<0) n=0;
+  const end=Math.min(n+48, times.length);
+  const slice=(arr)=>arr.slice(n,end);
+  const sliceModel=(by)=>{const o={};for(const id in by)o[id]=by[id].slice(n,end);return o;};
+
+  // ---- hourly temperature ----
+  const tByModel=collect(data.hourly,"temperature_2m");
+  const tSlice=sliceModel(tByModel);
+  const labels=slice(times);
+  const len=labels.length;
+  const tCon=consensus(tSlice,len);
+
+  // ---- hourly precip (consensus mean) ----
+  const pByModel=sliceModel(collect(data.hourly,"precipitation"));
+  const pCon=consensus(pByModel,len);
+
+  // ---- current ----
+  const curT=collect(data.current,"temperature_2m");
+  const curVals=Object.values(curT).filter(v=>v!=null);
+  const nowTemp = curVals.length
+    ? round(curVals.reduce((a,b)=>a+b,0)/curVals.length)
+    : round(tCon.mean[0]);
+  const nowSpread = curVals.length ? round(Math.max(...curVals)-Math.min(...curVals),1) : null;
+
+  // rain in next 6h: how many models predict any precip
+  let rainModels=0;
+  for(const id in pByModel){
+    const arr=pByModel[id].slice(0,6);
+    if(arr.some(v=>v!=null && v>=0.1)) rainModels++;
+  }
+  const totalModels=Object.keys(pByModel).length;
+
+  renderNow(nowTemp,nowSpread,rainModels,totalModels,labels[0]);
+  renderTempChart(labels,tSlice,tCon);
+  renderPrecipChart(labels,pCon);
+  renderLegend();
+  renderDays(data);
+}
+
+// ---- now strip ----
+function renderNow(temp,spread,rainModels,total,firstTime){
+  const rainTxt = rainModels===0
+    ? "kuiv järgmised tunnid"
+    : `${rainModels}/${total} mudelit ennustab sademeid`;
+  const spreadTxt = spread!=null && spread>0
+    ? `mudelite vahe ±${spread}°`
+    : "mudelid üksmeelel";
+  document.getElementById("now").innerHTML=`
+    <div class="now-temp"><span class="big">${temp ?? "–"}</span><span class="deg">°C</span></div>
+    <div class="now-meta">
+      <span class="label">Praegune konsensus</span>
+      <span class="val">${rainTxt}</span>
+      <span class="now-range">${spreadTxt}</span>
+    </div>`;
+}
+
+// ---- temperature chart ----
+function renderTempChart(labels,byModel,con){
+  const ds=[];
+  // individual models, thin & translucent
+  for(const m of MODELS){
+    if(!byModel[m.id]) continue;
+    ds.push({
+      label:m.name,data:byModel[m.id],borderColor:m.color+"99",
+      borderWidth:1.4,pointRadius:0,tension:.35,fill:false,
+    });
+  }
+  // consensus, bold
+  ds.push({
+    label:"Konsensus",data:con.mean,borderColor:TEMP,
+    borderWidth:3,pointRadius:0,tension:.35,fill:false,
+  });
+  tempChart?.destroy();
+  tempChart=new Chart(document.getElementById("tempChart"),{
+    type:"line",
+    data:{labels,datasets:ds},
+    options:baseOpts(labels,"°"),
+  });
+}
+
+// ---- precip chart ----
+function renderPrecipChart(labels,con){
+  const opts=baseOpts(labels," mm");
+  opts.scales.y.beginAtZero=true;
+  precipChart?.destroy();
+  precipChart=new Chart(document.getElementById("precipChart"),{
+    type:"bar",
+    data:{labels,datasets:[{
+      label:"Sademed",data:con.mean,backgroundColor:PRECIP+"cc",
+      borderRadius:3,barPercentage:1,categoryPercentage:.96,
+    }]},
+    options:opts,
+  });
+}
+
+function baseOpts(labels,suffix){
+  return {
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:"index",intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        callbacks:{
+          title:(it)=>fmtFull(labels[it[0].dataIndex]),
+          label:(it)=>`${it.dataset.label}: ${round(it.parsed.y,1)}${suffix}`,
+        }
+      }
+    },
+    scales:{
+      x:{
+        grid:{display:false},
+        ticks:{
+          color:"#92a1aa",font:{family:"Inter",size:11},maxRotation:0,autoSkip:false,
+          callback:(v,i)=>{
+            const d=new Date(labels[i]);
+            return d.getHours()%6===0 ? fmtTick(labels[i]) : "";
+          }
+        }
+      },
+      y:{
+        grid:{color:"#eef2f5"},border:{display:false},
+        ticks:{color:"#92a1aa",font:{family:"Inter",size:11},
+          callback:(v)=>v+suffix}
+      }
+    }
+  };
+}
+
+// ---- 7 day ----
+function renderDays(data){
+  const d=data.daily;
+  const hiBy=collect(d,"temperature_2m_max");
+  const loBy=collect(d,"temperature_2m_min");
+  const pBy =collect(d,"precipitation_sum");
+  const len=d.time.length;
+  const hi=consensus(hiBy,len), lo=consensus(loBy,len), pr=consensus(pBy,len);
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  let html="";
+  for(let i=0;i<len;i++){
+    const date=new Date(d.time[i]);
+    const diff=Math.round((date-today)/86400000);
+    let dow = diff===0?"Täna":diff===1?"Homme":DOW[date.getDay()];
+    const dstr=`${date.getDate()}.${date.getMonth()+1}`;
+    const spread = (hi.max[i]!=null&&hi.min[i]!=null) ? hi.max[i]-hi.min[i] : 0;
+    const dotColor = spread<=2 ? "var(--agree)" : spread<=4 ? "var(--partial)" : "var(--diverge)";
+    const agreeTxt = spread<=2 ? "kindel" : spread<=4 ? `±${round(spread/2,1)}°` : `±${round(spread/2,1)}°`;
+    const rain=round(pr.mean[i],1);
+    html+=`
+      <div class="day">
+        <div>
+          <div class="dow">${dow}</div>
+          <div class="date">${dstr}</div>
+        </div>
+        <div>
+          <div class="hi">${round(hi.mean[i])}°</div>
+          <div class="lo">${round(lo.mean[i])}°</div>
+        </div>
+        <div class="rain">${rain>0?"💧 "+rain+" mm":"–"}</div>
+        <div class="agree"><span class="dot" style="background:${dotColor}"></span>${agreeTxt}</div>
+      </div>`;
+  }
+  document.getElementById("days").innerHTML=html;
+}
+
+// ---- legend ----
+function renderLegend(){
+  let html="";
+  for(const m of MODELS){
+    html+=`<span class="item"><span class="swatch" style="background:${m.color}"></span>${m.name}</span>`;
+  }
+  html+=`<span class="item"><span class="swatch thick" style="background:${TEMP}"></span><b style="color:var(--ink)">Konsensus</b></span>`;
+  document.getElementById("legend").innerHTML=html;
+}
+
+// ---- formatting ----
+function fmtTick(iso){
+  const d=new Date(iso);
+  const h=String(d.getHours()).padStart(2,"0");
+  return h+":00";
+}
+function fmtFull(iso){
+  const d=new Date(iso);
+  const day=DOW[d.getDay()];
+  const h=String(d.getHours()).padStart(2,"0");
+  return `${day} ${d.getDate()}.${d.getMonth()+1} ${h}:00`;
+}
+
+// ---- init ----
+const sel=document.getElementById("city");
+CITIES.forEach((c,i)=>{
+  const o=document.createElement("option");
+  o.value=i;o.textContent=c.name;sel.appendChild(o);
+});
+sel.addEventListener("change",()=>load(CITIES[sel.value]));
+load(CITIES[0]);
+</script>
+</body>
+</html>
