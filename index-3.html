@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eesti ilm · mudelite konsensus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef2f5;
+    --surface:#ffffff;
+    --ink:#1b2a33;
+    --ink-soft:#5a6b75;
+    --ink-faint:#92a1aa;
+    --line:#dde5ea;
+    --temp:#e8743b;
+    --temp-soft:#f4c4a8;
+    --precip:#1c7c9c;
+    --precip-soft:#bfe0ea;
+    --wind:#4a7d8f;
+    --gust:#d8a23a;
+    --agree:#3f9b6b;
+    --partial:#d8a23a;
+    --diverge:#d05a52;
+    --shadow:0 1px 2px rgba(27,42,51,.06), 0 8px 24px rgba(27,42,51,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;
+    line-height:1.5;
+    padding:clamp(16px,4vw,40px);
+    max-width:1080px;
+    margin:0 auto;
+  }
+  header{
+    display:flex;flex-wrap:wrap;gap:16px;
+    align-items:flex-end;justify-content:space-between;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:12px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-faint);
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:clamp(26px,5vw,38px);font-weight:600;
+    letter-spacing:-.02em;line-height:1.05;
+  }
+  .sub{color:var(--ink-soft);font-size:14px;margin-top:8px;max-width:46ch}
+  .picker label{display:block;font-size:12px;color:var(--ink-faint);
+    font-weight:500;margin-bottom:6px;letter-spacing:.04em}
+  select{
+    font-family:"Space Grotesk",sans-serif;
+    font-size:18px;font-weight:500;color:var(--ink);
+    background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;
+    padding:12px 40px 12px 16px;cursor:pointer;
+    box-shadow:var(--shadow);appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6b75' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  select:focus-visible{outline:2px solid var(--temp);outline-offset:2px}
+
+  .now{
+    background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+    padding:clamp(18px,3vw,26px);margin-bottom:22px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:clamp(18px,4vw,40px);
+  }
+  .now-temp{display:flex;align-items:baseline;gap:4px}
+  .now-temp .big{
+    font-family:"Space Grotesk",sans-serif;font-weight:600;
+    font-size:clamp(48px,11vw,72px);line-height:.9;
+    color:var(--temp);font-variant-numeric:tabular-nums;
+  }
+  .now-temp .deg{font-size:clamp(22px,5vw,30px);color:var(--temp);font-family:"Space Grotesk",sans-serif}
+  .now-meta{display:flex;flex-direction:column;gap:6px}
+  .now-meta .label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  .now-meta .val{font-size:15px;color:var(--ink-soft)}
+  .now-meta .val b{color:var(--ink);font-weight:600}
+  .now-range{font-family:"Space Grotesk",sans-serif;font-size:14px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+
+  section{
+    background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+    padding:clamp(18px,3vw,28px);margin-bottom:22px;
+  }
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  h2{font-family:"Space Grotesk",sans-serif;font-size:18px;font-weight:600;letter-spacing:-.01em}
+  .sec-note{font-size:13px;color:var(--ink-faint)}
+
+  .chart-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-faint);margin:18px 0 8px}
+  .chart-wrap{position:relative;height:220px}
+  .chart-wrap.short{height:150px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+  .legend .item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft)}
+  .legend .swatch{width:18px;height:3px;border-radius:2px}
+  .legend .swatch.thick{height:5px}
+
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-top:14px}
+  .day{
+    border:1px solid var(--line);border-radius:14px;padding:12px 8px;
+    text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .day:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .day.far{opacity:.55;border-style:dashed}
+  .day .dow{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:13px}
+  .day .date{font-size:11px;color:var(--ink-faint);margin-top:-4px}
+  .day .icon{width:30px;height:30px}
+  .day .icon svg{width:100%;height:100%;display:block}
+  .day .hi{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:22px;
+    font-variant-numeric:tabular-nums;color:var(--temp)}
+  .day .lo{font-size:13px;color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-top:-6px}
+  .day .rain{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--precip);
+    font-variant-numeric:tabular-nums;font-weight:500}
+  .day .rain svg{width:11px;height:11px}
+  .day .windrow{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--wind);
+    font-variant-numeric:tabular-nums}
+  .day .windrow svg{width:12px;height:12px}
+  .day .agree{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint)}
+  .dot{width:8px;height:8px;border-radius:50%}
+
+  .msg{padding:40px 16px;text-align:center;color:var(--ink-soft);font-size:14px}
+  .spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--temp);
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  footer{font-size:12px;color:var(--ink-faint);text-align:center;padding:6px 0 4px;line-height:1.7}
+  footer a{color:var(--ink-soft)}
+
+  @media(max-width:680px){
+    .days{grid-template-columns:repeat(4,1fr)}
+  }
+  @media(max-width:440px){
+    .days{grid-template-columns:repeat(3,1fr)}
+    header{align-items:stretch}
+    .picker{width:100%}
+    select{width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Mitme mudeli konsensus</div>
+    <h1>Eesti ilm</h1>
+    <p class="sub">Viis sõltumatut prognoosimudelit korraga. Paks joon on keskmine, õhukesed jooned üksikud mudelid — kus nad lahknevad, on prognoos ebakindel.</p>
+  </div>
+  <div class="picker">
+    <label for="city">Asukoht</label>
+    <select id="city"></select>
+  </div>
+</header>
+
+<div class="now" id="now">
+  <div class="msg"><div class="spinner"></div>Laen prognoosi…</div>
+</div>
+
+<section>
+  <div class="sec-head">
+    <h2>Järgmised 48 tundi</h2>
+    <span class="sec-note">tunni täpsusega</span>
+  </div>
+  <div class="chart-label">Temperatuur °C</div>
+  <div class="chart-wrap"><canvas id="tempChart"></canvas></div>
+  <div class="chart-label">Sademed mm/h · keskmine</div>
+  <div class="chart-wrap short"><canvas id="precipChart"></canvas></div>
+  <div class="chart-label">Tuul m/s · keskmine ja puhangud</div>
+  <div class="chart-wrap short"><canvas id="windChart"></canvas></div>
+  <div class="legend" id="legend"></div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>14 päeva</h2>
+    <span class="sec-note">päevad 8–14 ainult ECMWF + GFS põhjal — pigem trend kui lubadus</span>
+  </div>
+  <div class="days" id="days"></div>
+</section>
+
+<footer>
+  Andmed: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> ·
+  mudelid ECMWF, MET Nordic, DWD ICON, NOAA GFS, KNMI<br>
+  Prognoos uueneb iga paari tunni tagant. Mida laiem mudelite hajuvus, seda ettevaatlikum tasub olla.
+</footer>
+
+<script>
+const CITIES = [
+  { name:"Tallinn",      lat:59.4370, lon:24.7536 },
+  { name:"Pärnu",        lat:58.3859, lon:24.4971 },
+  { name:"Tartu",        lat:58.3780, lon:26.7290 },
+  { name:"Saaremaa",     lat:58.2528, lon:22.4853 },
+  { name:"Narva-Jõesuu", lat:59.4561, lon:28.0411 },
+];
+
+const MODELS = [
+  { id:"ecmwf_ifs025",  name:"ECMWF",           color:"#3b6fb0" },
+  { id:"metno_nordic",  name:"MET Nordic 1 km", color:"#8e6fb0" },
+  { id:"icon_seamless", name:"ICON (DWD)",      color:"#5aa9a3" },
+  { id:"gfs_seamless",  name:"GFS (NOAA)",      color:"#c98a3b" },
+  { id:"knmi_seamless", name:"KNMI",            color:"#9ba84f" },
+];
+
+const DOW = ["Pühap","Esmasp","Teisip","Kolmap","Neljap","Reede","Laup"];
+const TEMP="#e8743b", PRECIP="#1c7c9c", WIND="#4a7d8f", GUST="#d8a23a";
+
+let tempChart, precipChart, windChart;
+
+const round = (x,d=0)=> x==null?null:Math.round(x*10**d)/10**d;
+
+function consensus(seriesByModel,len){
+  const mean=[],min=[],max=[],count=[];
+  for(let i=0;i<len;i++){
+    const vals=[];
+    for(const id in seriesByModel){
+      const v=seriesByModel[id]?.[i];
+      if(v!=null && !Number.isNaN(v)) vals.push(v);
+    }
+    if(vals.length){
+      mean.push(vals.reduce((a,b)=>a+b,0)/vals.length);
+      min.push(Math.min(...vals));
+      max.push(Math.max(...vals));
+    } else { mean.push(null); min.push(null); max.push(null); }
+    count.push(vals.length);
+  }
+  return {mean,min,max,count};
+}
+
+function collect(block,base){
+  const out={};
+  for(const m of MODELS){
+    const key=base+"_"+m.id;
+    if(block && block[key]) out[m.id]=block[key];
+  }
+  return out;
+}
+
+// ---- weather icons (inline SVG — reliable on all phones) ----
+function svgWrap(inner,color){
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+}
+const CLOUD='M7 17.5h9.2a3.8 3.8 0 0 0 .4-7.6 5 5 0 0 0-9.6-1.2A3.9 3.9 0 0 0 7 17.5z';
+const ICONS={
+  sun:    ()=>svgWrap('<circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M18.6 5.4l-1.4 1.4M6.8 17.2l-1.4 1.4"/>', '#d8a23a'),
+  partly: ()=>svgWrap('<circle cx="8" cy="8" r="3"/><path d="M8 2.5V4M2.5 8H4M4.1 4.1l1 1M13.5 8l-1-.1"/><path d="M10 19h7.4a3.2 3.2 0 0 0 .3-6.4 4.2 4.2 0 0 0-8-1A3.3 3.3 0 0 0 10 19z"/>', '#8a99a3'),
+  cloud:  ()=>svgWrap(`<path d="${CLOUD}"/>`, '#8a99a3'),
+  fog:    ()=>svgWrap(`<path d="M7 13.5h9.2a3.8 3.8 0 0 0 .4-7.6 5 5 0 0 0-9.6-1.2A3.9 3.9 0 0 0 7 13.5z"/><path d="M5.5 17h13M7.5 20h9"/>`, '#8a99a3'),
+  drizzle:()=>svgWrap(`<path d="${CLOUD}"/><path d="M9 20l.5-1.5M13 20l.5-1.5M17 20l.5-1.5"/>`, '#1c7c9c'),
+  rain:   ()=>svgWrap(`<path d="${CLOUD}"/><path d="M8.5 19.5l1-2.5M12.5 21l1-2.5M16.5 19.5l1-2.5"/>`, '#1c7c9c'),
+  snow:   ()=>svgWrap(`<path d="${CLOUD}"/><path d="M9 19.6h.01M13 21h.01M17 19.6h.01" stroke-width="2.4"/>`, '#6c8fb8'),
+  thunder:()=>svgWrap(`<path d="${CLOUD}"/><path d="M12.5 16l-2 3.5h3l-2 3.5" stroke="#d8a23a"/>`, '#8a99a3'),
+};
+const SEVERITY=["thunder","snow","rain","drizzle","fog","cloud","partly","sun"];
+function codeGroup(c){
+  if(c==null||Number.isNaN(c)) return null;
+  if(c>=95) return "thunder";
+  if(c>=85) return "snow";
+  if(c>=80) return "rain";
+  if(c>=71) return "snow";
+  if(c>=61) return "rain";
+  if(c>=51) return "drizzle";
+  if(c>=45) return "fog";
+  if(c>=3)  return "cloud";
+  if(c>=1)  return "partly";
+  return "sun";
+}
+function consensusIcon(codesByModel,i){
+  const counts={};
+  for(const id in codesByModel){
+    const g=codeGroup(codesByModel[id]?.[i]);
+    if(g) counts[g]=(counts[g]||0)+1;
+  }
+  const groups=Object.keys(counts);
+  if(!groups.length) return ICONS.cloud();
+  groups.sort((a,b)=>{
+    const d=counts[b]-counts[a];
+    return d!==0?d:SEVERITY.indexOf(a)-SEVERITY.indexOf(b);
+  });
+  return ICONS[groups[0]]();
+}
+
+const dropSvg='<svg viewBox="0 0 24 24" fill="#1c7c9c"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11z"/></svg>';
+const windSvg='<svg viewBox="0 0 24 24" fill="none" stroke="#4a7d8f" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10a2.5 2.5 0 1 0-2.5-2.5M3 12h15a2.5 2.5 0 1 1-2.5 2.5M3 16h8a2 2 0 1 1-2 2"/></svg>';
+
+async function load(city){
+  setLoading();
+  const base="https://api.open-meteo.com/v1/forecast";
+  const ids=MODELS.map(m=>m.id).join(",");
+  const url=`${base}?latitude=${city.lat}&longitude=${city.lon}`+
+    `&hourly=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m`+
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,wind_gusts_10m_max`+
+    `&current=temperature_2m,precipitation,wind_speed_10m`+
+    `&forecast_days=14&wind_speed_unit=ms&timezone=Europe%2FTallinn&models=${ids}`;
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=await r.json();
+    render(data);
+  }catch(e){
+    setError();
+    console.error(e);
+  }
+}
+
+function setLoading(){
+  document.getElementById("now").innerHTML=
+    '<div class="msg"><div class="spinner"></div>Laen prognoosi…</div>';
+}
+function setError(){
+  document.getElementById("now").innerHTML=
+    '<div class="msg">Prognoosi ei õnnestunud laadida. Kontrolli internetiühendust ja proovi uuesti.</div>';
+}
+
+function render(data){
+  const times=data.hourly.time;
+  const nowRef=data.current?.time || times[0];
+  let n=times.findIndex(t=>t>=nowRef);
+  if(n<0) n=0;
+  const end=Math.min(n+48, times.length);
+  const slice=(arr)=>arr.slice(n,end);
+  const sliceModel=(by)=>{const o={};for(const id in by)o[id]=by[id].slice(n,end);return o;};
+
+  const labels=slice(times);
+  const len=labels.length;
+
+  const tSlice=sliceModel(collect(data.hourly,"temperature_2m"));
+  const tCon=consensus(tSlice,len);
+
+  const pByModel=sliceModel(collect(data.hourly,"precipitation"));
+  const pCon=consensus(pByModel,len);
+
+  const wSlice=sliceModel(collect(data.hourly,"wind_speed_10m"));
+  const wCon=consensus(wSlice,len);
+  const gSlice=sliceModel(collect(data.hourly,"wind_gusts_10m"));
+  const gCon=consensus(gSlice,len);
+
+  // current
+  const curT=collect(data.current,"temperature_2m");
+  const curVals=Object.values(curT).filter(v=>v!=null);
+  const nowTemp = curVals.length
+    ? round(curVals.reduce((a,b)=>a+b,0)/curVals.length)
+    : round(tCon.mean[0]);
+  const nowSpread = curVals.length ? round(Math.max(...curVals)-Math.min(...curVals),1) : null;
+
+  const curW=collect(data.current,"wind_speed_10m");
+  const curWVals=Object.values(curW).filter(v=>v!=null);
+  const nowWind = curWVals.length
+    ? round(curWVals.reduce((a,b)=>a+b,0)/curWVals.length)
+    : round(wCon.mean[0]);
+
+  let rainModels=0;
+  for(const id in pByModel){
+    const arr=pByModel[id].slice(0,6);
+    if(arr.some(v=>v!=null && v>=0.1)) rainModels++;
+  }
+  const totalModels=Object.keys(pByModel).length;
+
+  renderNow(nowTemp,nowSpread,nowWind,rainModels,totalModels);
+  renderTempChart(labels,tSlice,tCon);
+  renderPrecipChart(labels,pCon);
+  renderWindChart(labels,wCon,gCon);
+  renderLegend();
+  renderDays(data);
+}
+
+function renderNow(temp,spread,wind,rainModels,total){
+  const rainTxt = rainModels===0
+    ? "kuiv järgmised tunnid"
+    : `${rainModels}/${total} mudelit ennustab sademeid`;
+  const spreadTxt = spread!=null && spread>0
+    ? `mudelite vahe ±${spread}°`
+    : "mudelid üksmeelel";
+  const windTxt = wind!=null ? `tuul <b>${wind} m/s</b>` : "";
+  document.getElementById("now").innerHTML=`
+    <div class="now-temp"><span class="big">${temp ?? "–"}</span><span class="deg">°C</span></div>
+    <div class="now-meta">
+      <span class="label">Praegune konsensus</span>
+      <span class="val">${rainTxt}${windTxt?" · "+windTxt:""}</span>
+      <span class="now-range">${spreadTxt}</span>
+    </div>`;
+}
+
+function renderTempChart(labels,byModel,con){
+  const ds=[];
+  for(const m of MODELS){
+    if(!byModel[m.id]) continue;
+    ds.push({
+      label:m.name,data:byModel[m.id],borderColor:m.color+"99",
+      borderWidth:1.4,pointRadius:0,tension:.35,fill:false,
+    });
+  }
+  ds.push({
+    label:"Konsensus",data:con.mean,borderColor:TEMP,
+    borderWidth:3,pointRadius:0,tension:.35,fill:false,
+  });
+  tempChart?.destroy();
+  tempChart=new Chart(document.getElementById("tempChart"),{
+    type:"line",
+    data:{labels,datasets:ds},
+    options:baseOpts(labels,"°"),
+  });
+}
+
+function renderPrecipChart(labels,con){
+  const opts=baseOpts(labels," mm");
+  opts.scales.y.beginAtZero=true;
+  precipChart?.destroy();
+  precipChart=new Chart(document.getElementById("precipChart"),{
+    type:"bar",
+    data:{labels,datasets:[{
+      label:"Sademed",data:con.mean,backgroundColor:PRECIP+"cc",
+      borderRadius:3,barPercentage:1,categoryPercentage:.96,
+    }]},
+    options:opts,
+  });
+}
+
+function renderWindChart(labels,wCon,gCon){
+  const opts=baseOpts(labels," m/s");
+  opts.scales.y.beginAtZero=true;
+  windChart?.destroy();
+  windChart=new Chart(document.getElementById("windChart"),{
+    type:"line",
+    data:{labels,datasets:[
+      {label:"Tuul",data:wCon.mean,borderColor:WIND,borderWidth:2.5,
+       pointRadius:0,tension:.35,fill:false},
+      {label:"Puhangud",data:gCon.mean,borderColor:GUST,borderWidth:1.6,
+       borderDash:[5,4],pointRadius:0,tension:.35,fill:false},
+    ]},
+    options:opts,
+  });
+}
+
+function baseOpts(labels,suffix){
+  return {
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:"index",intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        callbacks:{
+          title:(it)=>fmtFull(labels[it[0].dataIndex]),
+          label:(it)=>`${it.dataset.label}: ${round(it.parsed.y,1)}${suffix}`,
+        }
+      }
+    },
+    scales:{
+      x:{
+        grid:{display:false},
+        ticks:{
+          color:"#92a1aa",font:{family:"Inter",size:11},maxRotation:0,autoSkip:false,
+          callback:(v,i)=>{
+            const d=new Date(labels[i]);
+            return d.getHours()%6===0 ? fmtTick(labels[i]) : "";
+          }
+        }
+      },
+      y:{
+        grid:{color:"#eef2f5"},border:{display:false},
+        ticks:{color:"#92a1aa",font:{family:"Inter",size:11},
+          callback:(v)=>v+suffix}
+      }
+    }
+  };
+}
+
+function renderDays(data){
+  const d=data.daily;
+  const hiBy=collect(d,"temperature_2m_max");
+  const loBy=collect(d,"temperature_2m_min");
+  const pBy =collect(d,"precipitation_sum");
+  const gBy =collect(d,"wind_gusts_10m_max");
+  const codeBy=collect(d,"weather_code");
+  const len=d.time.length;
+  const hi=consensus(hiBy,len), lo=consensus(loBy,len),
+        pr=consensus(pBy,len), gu=consensus(gBy,len);
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  let html="";
+  for(let i=0;i<len;i++){
+    const date=new Date(d.time[i]);
+    const diff=Math.round((date-today)/86400000);
+    let dow = diff===0?"Täna":diff===1?"Homme":DOW[date.getDay()];
+    const dstr=`${date.getDate()}.${date.getMonth()+1}`;
+    const spread = (hi.max[i]!=null&&hi.min[i]!=null) ? hi.max[i]-hi.min[i] : 0;
+    const far = hi.count[i]<=2;
+    const dotColor = spread<=2 ? "var(--agree)" : spread<=4 ? "var(--partial)" : "var(--diverge)";
+    const agreeTxt = far ? `${hi.count[i]} mudelit`
+      : spread<=2 ? "kindel" : `±${round(spread/2,1)}°`;
+    const rain=round(pr.mean[i],1);
+    const gust=round(gu.mean[i]);
+    html+=`
+      <div class="day${far?" far":""}">
+        <div>
+          <div class="dow">${dow}</div>
+          <div class="date">${dstr}</div>
+        </div>
+        <div class="icon">${consensusIcon(codeBy,i)}</div>
+        <div>
+          <div class="hi">${round(hi.mean[i])}°</div>
+          <div class="lo">${round(lo.mean[i])}°</div>
+        </div>
+        <div class="rain">${rain>0?dropSvg+rain+" mm":"–"}</div>
+        <div class="windrow">${gust!=null?windSvg+gust+" m/s":""}</div>
+        <div class="agree"><span class="dot" style="background:${far?"var(--ink-faint)":dotColor}"></span>${agreeTxt}</div>
+      </div>`;
+  }
+  document.getElementById("days").innerHTML=html;
+}
+
+function renderLegend(){
+  let html="";
+  for(const m of MODELS){
+    html+=`<span class="item"><span class="swatch" style="background:${m.color}"></span>${m.name}</span>`;
+  }
+  html+=`<span class="item"><span class="swatch thick" style="background:${TEMP}"></span><b style="color:var(--ink)">Konsensus</b></span>`;
+  document.getElementById("legend").innerHTML=html;
+}
+
+function fmtTick(iso){
+  const d=new Date(iso);
+  return String(d.getHours()).padStart(2,"0")+":00";
+}
+function fmtFull(iso){
+  const d=new Date(iso);
+  const h=String(d.getHours()).padStart(2,"0");
+  return `${DOW[d.getDay()]} ${d.getDate()}.${d.getMonth()+1} ${h}:00`;
+}
+
+const sel=document.getElementById("city");
+CITIES.forEach((c,i)=>{
+  const o=document.createElement("option");
+  o.value=i;o.textContent=c.name;sel.appendChild(o);
+});
+sel.addEventListener("change",()=>load(CITIES[sel.value]));
+load(CITIES[0]);
+</script>
+</body>
+</html>
